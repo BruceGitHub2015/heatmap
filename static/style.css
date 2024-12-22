@@ -1,0 +1,67 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f9;
+    overflow: hidden; /* Remove vertical scrollbar */
+}
+
+.container {
+    display: flex;
+    height: 100vh; /* Use full viewport height */
+}
+
+.sidebar {
+    flex: 1;
+    background: #eaeaea;
+    padding: 20px;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+h3 {
+    font-size: 14px; /* Smaller font for list titles */
+    margin-bottom: 10px;
+}
+
+.content {
+    flex: 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #ffffff;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.heatmap-container img {
+    max-width: 100%;
+    max-height: 90vh; /* Limit image height */
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+label {
+    display: block;
+    margin: 5px 0;
+    font-size: 14px; /* Smaller font for checkboxes */
+}
+
+input[type="checkbox"] {
+    transform: scale(1.5); /* Make checkboxes bigger */
+    margin-right: 10px;
+}
+
+button {
+    margin-top: 10px;
+    padding: 10px 20px;
+    background-color: #007BFF;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
