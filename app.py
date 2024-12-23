@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')  # Use the Agg backend for non-interactive use
+
 from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify
 import os
 import numpy as np
@@ -33,6 +36,7 @@ table1_columns = []
 table2_columns = []
 correlation_matrix = None
 xtick_rotation = 90  # Global variable for x-tick labels rotation
+filename = ''
 
 @app.route('/')
 def index():
@@ -40,7 +44,7 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    global uploaded_data, combined_table, table1_columns, table2_columns, correlation_matrix
+    global uploaded_data, combined_table, table1_columns, table2_columns, correlation_matrix, filename
 
     if 'file' not in request.files:
         return render_template('heatmap.html', heatmap_filename=None, error_message="No file part in the request.", table1_columns=[], table2_columns=[], correlation_method='pearson', file_name='')
@@ -65,10 +69,10 @@ def upload():
             try:
                 data = pd.read_csv(filepath, encoding='gbk')  # Fallback to GBK
             except Exception as e:
-                return render_template('heatmap.html', heatmap_filename=None, error_message=f"Unable to read the file: {e}", table1_columns=[], table2_columns=[], correlation_method=correlation_method, file_name=filename)
+                return render_template('heatmap.html', heatmap_filename=None, error_message=f"Unable to read the file: {e}", table1_columns=[], table2_columns=[], correlation_method=correlation_method, file_name='')
 
         if data.empty or data.shape[1] < 2:
-            return render_template('heatmap.html', heatmap_filename=None, error_message="CSV must have at least two columns.", table1_columns=[], table2_columns=[], correlation_method=correlation_method, file_name=filename)
+            return render_template('heatmap.html', heatmap_filename=None, error_message="CSV must have at least two columns.", table1_columns=[], table2_columns=[], correlation_method=correlation_method, file_name='')
 
         # Process the data
         combined_table, table1_columns, table2_columns = data_processing(data)
@@ -90,7 +94,9 @@ def upload():
             heatmap_path = os.path.join(app.config['UPLOAD_FOLDER'], heatmap_filename)
             plt.savefig(heatmap_path, bbox_inches='tight')
             plt.close()
-            return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name=filename, error_message=None)
+            return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name=filename)
+
+    return render_template('heatmap.html', heatmap_filename=None, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name='', error_message="Error processing the file.")
 
 @app.route('/update_columns', methods=['POST'])
 def update_columns():
@@ -189,9 +195,9 @@ def sort_columns():
                 heatmap_path = os.path.join(app.config['UPLOAD_FOLDER'], heatmap_filename)
                 plt.savefig(heatmap_path, bbox_inches='tight')
                 plt.close()
-                return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name='', error_message=None)
+                return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name=filename)
         
-        return render_template('heatmap.html', heatmap_filename=None, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name='', error_message="Invalid primary column selected.")
+        return render_template('heatmap.html', heatmap_filename=None, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name='', error_message="Could not find the primary column in the combined table.")
     return render_template('heatmap.html', heatmap_filename=None, table1_columns=[], table2_columns=[], correlation_method='pearson', file_name='', error_message="No combined table available to sort.")
 
 @app.route('/download_combined_table', methods=['GET'])
@@ -199,7 +205,7 @@ def download_combined_table():
     global combined_table
     if combined_table is not None:
         unique_id = uuid.uuid4().hex
-        combined_filename = f"combined_table_{unique_id}.csv"
+        combined_filename = f"{filename}_cleaned_{unique_id}.csv"
         combined_path = os.path.join(app.config['UPLOAD_FOLDER'], combined_filename)
         combined_table.to_csv(combined_path, index=False)
         return send_from_directory(app.config['UPLOAD_FOLDER'], combined_filename, as_attachment=True)
@@ -211,7 +217,7 @@ def download_heatmap():
     global correlation_matrix
     if correlation_matrix is not None:
         unique_id = uuid.uuid4().hex
-        heatmap_filename = f"heatmap_data_{unique_id}.csv"
+        heatmap_filename = f"{filename}_corr_{unique_id}.csv"
         heatmap_path = os.path.join(app.config['UPLOAD_FOLDER'], heatmap_filename)
         correlation_matrix.to_csv(heatmap_path)
         return send_from_directory(app.config['UPLOAD_FOLDER'], heatmap_filename, as_attachment=True)
@@ -223,4 +229,4 @@ def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False, port=5003)
