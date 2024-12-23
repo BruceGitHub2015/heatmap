@@ -8,11 +8,21 @@
 </head>
 <body>
     <div class="container">
-        <!-- Left Sidebar: Column Headers -->
+        <!-- Left Sidebar: File Picker, Correlation Method, and Column Headers -->
         <div class="sidebar">
+            <form id="file-upload-form" enctype="multipart/form-data">
+                <input type="file" id="file-input" name="file" accept=".csv">
+                <label for="correlation-method">Correlation Method:</label>
+                <select id="correlation-method" name="correlation_method">
+                    <option value="pearson">Pearson</option>
+                    <option value="kendall">Kendall</option>
+                    <option value="spearman">Spearman</option>
+                </select>
+                <button class="button" type="button" id="upload-button">Generate</button>
+            </form>
             <h3>Table 1 Columns</h3>
-            <button type="button" onclick="selectAll('table1')">Select All</button>
-            <button type="button" onclick="selectNone('table1')">Select None</button>
+            <button class="button" type="button" onclick="selectAll('table1')">Select All</button>
+            <button class="button" type="button" onclick="selectNone('table1')">Select None</button>
             <form id="update-columns-form">
                 {% for column in table1_columns %}
                     <label>
@@ -21,15 +31,18 @@
                     </label>
                 {% endfor %}
                 <h3>Table 2 Columns</h3>
-                <button type="button" onclick="selectAll('table2')">Select All</button>
-                <button type="button" onclick="selectNone('table2')">Select None</button>
+                <button class="button" type="button" onclick="selectAll('table2')">Select All</button>
+                <button class="button" type="button" onclick="selectNone('table2')">Select None</button>
                 {% for column in table2_columns %}
                     <label>
                         <input type="checkbox" name="columns" value="{{ column }}" class="table2" checked>
                         {{ column }}
                     </label>
                 {% endfor %}
-                <button type="button" id="update-button">Update Columns</button>
+                <div class="button-container">
+                    <button class="button" type="button" id="update-button">Update Plot</button>
+                    <button class="button" type="button" id="download-combined-button">Download Data</button>
+                </div>
             </form>            
         </div>
         
@@ -42,81 +55,39 @@
                     <p>No data to display in heatmap.</p>
                 {% endif %}
             </div>
-            <button type="button" id="download-button">Download Combined Table as CSV</button>
-            <div id="message-box" style="height: 150px; border: 1px solid #ccc; margin-top: 20px; padding: 10px;">
-                {% if error_message %}
-                    <p>{{ error_message }}</p>
-                {% else %}
-                    <p>No errors.</p>
-                {% endif %}
-            </div>
         </div>
         
         <!-- Right Sidebar: Sort by Column -->
         <div class="sidebar">
             <h3>Sort by Column</h3>
             <form action="/sort_columns" method="post">
-                {% for column in table1_columns + table2_columns %}
+                <div class="radio-container">
+                    <label>
+                        <input type="radio" name="sort_type" value="absolute" checked> Absolute Value
+                    </label>
+                    <label>
+                        <input type="radio" name="sort_type" value="signed"> Signed Value
+                    </label>
+                </div>
+                {% for column in table1_columns %}
                     <label>
                         <input type="radio" name="primary_column" value="{{ column }}" required>
                         {{ column }}
                     </label>
                 {% endfor %}
-                <button type="submit">Sort Heatmap</button>
+                {% for column in table2_columns %}
+                    <label>
+                        <input type="radio" name="primary_column" value="{{ column }}" required>
+                        {{ column }}
+                    </label>
+                {% endfor %}
+                <div class="button-container">
+                    <button class="button" type="submit">Sort</button>
+                    <button class="button" type="button" id="download-heatmap-button">Download Data</button>
+                </div>
             </form>
         </div>
     </div>
-    <script>
-        function selectAll(tableClass) {
-            document.querySelectorAll('input.' + tableClass).forEach(cb => cb.checked = true);
-        }
-        function selectNone(tableClass) {
-            document.querySelectorAll('input.' + tableClass).forEach(cb => cb.checked = false);
-        }
-        document.getElementById('update-button').addEventListener('click', () => {
-            const selectedColumns = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
-                .map(cb => cb.value);
-            fetch('/update_columns', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ columns: selectedColumns })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.heatmap_url) {
-                    document.getElementById('heatmap-container').innerHTML = `<img src="${data.heatmap_url}" alt="Updated Heatmap">`;
-                    document.getElementById('message-box').innerHTML = '<p>No errors.</p>'; // Clear any error messages
-                } else {
-                    document.getElementById('message-box').innerHTML = `<p>${data.error}</p>`;
-                }
-            });
-        });
-
-        document.getElementById('download-button').addEventListener('click', () => {
-            fetch('/download_combined_table', {
-                method: 'GET'
-            })
-            .then(response => {
-                if (response.status === 200) {
-                    return response.blob();
-                } else {
-                    throw new Error('Failed to download the file.');
-                }
-            })
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = 'combined_table.csv';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-            })
-            .catch(error => {
-                document.getElementById('message-box').innerHTML = `<p>${error.message}</p>`;
-            });
-        });
-    </script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>
