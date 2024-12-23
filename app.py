@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify, make_response
+from flask import Flask, request, redirect, url_for, render_template, send_from_directory, jsonify
 import os
 import numpy as np
 import pandas as pd
@@ -6,7 +6,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from werkzeug.utils import secure_filename
 import uuid
-from data_processing import data_processing
+from data_processing import data_processing  # Import the data_processing function
 
 # Ensure matplotlib can render Chinese characters
 plt.rcParams['font.sans-serif'] = ['SimHei']  # Use SimHei for Chinese
@@ -20,6 +20,10 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 uploaded_data = None
 combined_table = None
+table1_columns = []
+table2_columns = []
+correlation_matrix = None
+xtick_rotation = 45  # Global variable for x-tick labels rotation
 
 @app.route('/')
 def index():
@@ -27,12 +31,13 @@ def index():
 
 @app.route('/upload', methods=['POST'])
 def upload():
-    global uploaded_data, combined_table
+    global uploaded_data, combined_table, table1_columns, table2_columns, correlation_matrix
 
     if 'file' not in request.files:
         return render_template('heatmap.html', heatmap_filename=None, error_message="No file part in the request.", table1_columns=[], table2_columns=[])
 
     file = request.files['file']
+    correlation_method = request.form.get('correlation_method', 'pearson')
 
     if file.filename == '':
         return render_template('heatmap.html', heatmap_filename=None, error_message="No file selected.", table1_columns=[], table2_columns=[])
@@ -60,29 +65,60 @@ def upload():
         combined_table, table1_columns, table2_columns = data_processing(data)
         uploaded_data = data
 
-        return render_template('heatmap.html', heatmap_filename=None, table1_columns=table1_columns, table2_columns=table2_columns, error_message=None)
+        # Generate the heatmap with the combined table
+        numeric_combined_table = combined_table.select_dtypes(include=[np.number])
+        if not numeric_combined_table.empty:
+            correlation_matrix = numeric_combined_table.corr(method=correlation_method)
+            plt.figure(figsize=(12, 10))  # Adjust heatmap size
+            sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f', cbar_kws={'shrink': 0.75})
+            plt.xticks(rotation=xtick_rotation)  # Rotate x-tick labels by 45 degrees
+            plt.yticks(rotation=0)  # Ensure y-tick labels are not rotated
+            plt.title(f"Correlation Matrix ({correlation_method.capitalize()})", fontsize=12, loc='left')
+            plt.tight_layout()
+            unique_id = uuid.uuid4().hex
+            heatmap_filename = f"heatmap_{unique_id}.png"
+            heatmap_path = os.path.join(app.config['UPLOAD_FOLDER'], heatmap_filename)
+            plt.savefig(heatmap_path, bbox_inches='tight')
+            plt.close()
+            return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, error_message=None)
 
 @app.route('/update_columns', methods=['POST'])
 def update_columns():
-    global uploaded_data, combined_table
+    global uploaded_data, combined_table, table1_columns, table2_columns, correlation_matrix
+
+    if uploaded_data is None:
+        return {"error": "No data uploaded."}, 400
 
     if not uploaded_data.empty:
         # Get selected columns from the request
         selected_columns = request.json.get('columns', [])
-        
-        if selected_columns:
-            selected_data = uploaded_data[selected_columns]
-            combined_table = data_processing(selected_data)[0]
+        correlation_method = request.json.get('correlation_method', 'pearson')
+
+        # Separate selected columns into table1 and table2
+        selected_table1_columns = [col for col in selected_columns if col in table1_columns]
+        selected_table2_columns = [col for col in selected_columns if col in table2_columns]
+
+        # Insert an empty column between table1 and table2 columns
+        if selected_table1_columns and selected_table2_columns:
+            selected_columns_with_separator = selected_table1_columns + ['Separator'] + selected_table2_columns
+            uploaded_data['Separator'] = np.nan  # Add a separator column in the data
+        else:
+            selected_columns_with_separator = selected_columns
+
+        if selected_columns_with_separator:
+            selected_data = uploaded_data[selected_columns_with_separator]
+            combined_table, table1_columns, table2_columns = data_processing(selected_data)
 
             numeric_combined_table = combined_table.select_dtypes(include=[np.number])
 
             # Generate the heatmap with the selected columns
             if not numeric_combined_table.empty:
-                correlation_matrix = numeric_combined_table.corr()
+                correlation_matrix = numeric_combined_table.corr(method=correlation_method)
                 plt.figure(figsize=(12, 10))  # Adjust heatmap size
                 sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f', cbar_kws={'shrink': 0.75})
-                plt.xticks(rotation=45)
-                plt.yticks(rotation=0)
+                plt.xticks(rotation=xtick_rotation)  # Rotate x-tick labels by 45 degrees
+                plt.yticks(rotation=0)  # Ensure y-tick labels are not rotated
+                plt.title(f"Correlation Matrix ({correlation_method.capitalize()})", fontsize=12, loc='left')
                 plt.tight_layout()
                 unique_id = uuid.uuid4().hex
                 heatmap_filename = f"heatmap_{unique_id}.png"
@@ -91,6 +127,59 @@ def update_columns():
                 plt.close()
                 return {"heatmap_url": url_for('uploaded_file', filename=heatmap_filename)}
     return {"error": "No valid columns selected or no data available."}, 400
+
+@app.route('/sort_columns', methods=['POST'])
+def sort_columns():
+    global combined_table, table1_columns, table2_columns, correlation_matrix
+
+    if combined_table is not None:
+        primary_column = request.form.get('primary_column')
+        sort_type = request.form.get('sort_type', 'absolute')
+        correlation_method = request.form.get('correlation_method', 'pearson')
+
+        if primary_column and primary_column in combined_table.columns:
+            # Remove timestamp columns and select only numeric columns
+            combined_table = combined_table.select_dtypes(include=[np.number])
+
+            # Calculate the correlation matrix
+            correlation_matrix = combined_table.corr(method=correlation_method)
+
+            # Remove columns where the correlation matrix data is empty
+            correlation_matrix = correlation_matrix.dropna(axis=1, how='all').dropna(axis=0, how='all')
+
+            # Sort the correlation matrix based on the selected sort type
+            if sort_type == 'absolute':
+                correlations_with_primary = correlation_matrix[primary_column].abs().sort_values(ascending=False)
+            else:
+                correlations_with_primary = correlation_matrix[primary_column].sort_values(ascending=False)
+
+            # Reorder the combined table based on the sorted correlation coefficients
+            sorted_columns = correlations_with_primary.index.tolist()
+            sorted_combined_table = combined_table[sorted_columns]
+
+            # Ensure the primary column is at the bottom left corner by reversing the order
+            sorted_columns.reverse()
+            sorted_combined_table = combined_table[sorted_columns]
+
+            # Generate the heatmap with the sorted combined table
+            numeric_combined_table = sorted_combined_table.select_dtypes(include=[np.number])
+            if not numeric_combined_table.empty:
+                correlation_matrix = numeric_combined_table.corr(method=correlation_method)
+                plt.figure(figsize=(12, 10))  # Adjust heatmap size
+                sns.heatmap(correlation_matrix, annot=True, cmap='coolwarm', fmt='.2f', cbar_kws={'shrink': 0.75})
+                plt.xticks(rotation=xtick_rotation)  # Rotate x-tick labels by 45 degrees
+                plt.yticks(rotation=0)  # Ensure y-tick labels are not rotated
+                plt.title(f"Correlation Matrix ({correlation_method.capitalize()})", fontsize=12, loc='left')
+                plt.tight_layout()
+                unique_id = uuid.uuid4().hex
+                heatmap_filename = f"heatmap_{unique_id}.png"
+                heatmap_path = os.path.join(app.config['UPLOAD_FOLDER'], heatmap_filename)
+                plt.savefig(heatmap_path, bbox_inches='tight')
+                plt.close()
+                return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, error_message=None)
+        
+        return render_template('heatmap.html', heatmap_filename=None, table1_columns=table1_columns, table2_columns=table2_columns, error_message="Invalid primary column selected.")
+    return render_template('heatmap.html', heatmap_filename=None, table1_columns=[], table2_columns=[], error_message="No combined table available to sort.")
 
 @app.route('/download_combined_table', methods=['GET'])
 def download_combined_table():
@@ -103,6 +192,18 @@ def download_combined_table():
         return send_from_directory(app.config['UPLOAD_FOLDER'], combined_filename, as_attachment=True)
     else:
         return jsonify({"error": "No combined data available to download."}), 400
+
+@app.route('/download_heatmap', methods=['GET'])
+def download_heatmap():
+    global correlation_matrix
+    if correlation_matrix is not None:
+        unique_id = uuid.uuid4().hex
+        heatmap_filename = f"heatmap_data_{unique_id}.csv"
+        heatmap_path = os.path.join(app.config['UPLOAD_FOLDER'], heatmap_filename)
+        correlation_matrix.to_csv(heatmap_path)
+        return send_from_directory(app.config['UPLOAD_FOLDER'], heatmap_filename, as_attachment=True)
+    else:
+        return jsonify({"error": "No heatmap data available to download."}), 400
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
