@@ -4,12 +4,21 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 from werkzeug.utils import secure_filename
 import uuid
 from data_processing import data_processing  # Import the data_processing function
+import platform
 
 # Ensure matplotlib can render Chinese characters
-plt.rcParams['font.sans-serif'] = ['SimHei']  # Use SimHei for Chinese
+ops = platform.system()
+if ops =='Linux':
+    font_path = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
+    font_prop = font_manager.FontProperties(fname=font_path)
+    plt.rcParams['font.family']=font_prop.get_name()
+else:
+    plt.rcParams['font.sans-serif'] = ['SimHei']  # Use for Chinese
+
 plt.rcParams['axes.unicode_minus'] = False  # Ensure minus signs are rendered correctly
 plt.rcParams['xtick.labelsize'] = 12  # Increase x-axis label size
 plt.rcParams['ytick.labelsize'] = 12  # Increase y-axis label size
@@ -23,24 +32,24 @@ combined_table = None
 table1_columns = []
 table2_columns = []
 correlation_matrix = None
-xtick_rotation = 45  # Global variable for x-tick labels rotation
+xtick_rotation = 90  # Global variable for x-tick labels rotation
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('heatmap.html')
 
 @app.route('/upload', methods=['POST'])
 def upload():
     global uploaded_data, combined_table, table1_columns, table2_columns, correlation_matrix
 
     if 'file' not in request.files:
-        return render_template('heatmap.html', heatmap_filename=None, error_message="No file part in the request.", table1_columns=[], table2_columns=[])
+        return render_template('heatmap.html', heatmap_filename=None, error_message="No file part in the request.", table1_columns=[], table2_columns=[], correlation_method='pearson', file_name='')
 
     file = request.files['file']
     correlation_method = request.form.get('correlation_method', 'pearson')
 
     if file.filename == '':
-        return render_template('heatmap.html', heatmap_filename=None, error_message="No file selected.", table1_columns=[], table2_columns=[])
+        return render_template('heatmap.html', heatmap_filename=None, error_message="No file selected.", table1_columns=[], table2_columns=[], correlation_method=correlation_method, file_name='')
 
     if file:
         unique_id = uuid.uuid4().hex
@@ -56,10 +65,10 @@ def upload():
             try:
                 data = pd.read_csv(filepath, encoding='gbk')  # Fallback to GBK
             except Exception as e:
-                return render_template('heatmap.html', heatmap_filename=None, error_message=f"Unable to read the file: {e}", table1_columns=[], table2_columns=[])
+                return render_template('heatmap.html', heatmap_filename=None, error_message=f"Unable to read the file: {e}", table1_columns=[], table2_columns=[], correlation_method=correlation_method, file_name=filename)
 
         if data.empty or data.shape[1] < 2:
-            return render_template('heatmap.html', heatmap_filename=None, error_message="CSV must have at least two columns.", table1_columns=[], table2_columns=[])
+            return render_template('heatmap.html', heatmap_filename=None, error_message="CSV must have at least two columns.", table1_columns=[], table2_columns=[], correlation_method=correlation_method, file_name=filename)
 
         # Process the data
         combined_table, table1_columns, table2_columns = data_processing(data)
@@ -80,7 +89,7 @@ def upload():
             heatmap_path = os.path.join(app.config['UPLOAD_FOLDER'], heatmap_filename)
             plt.savefig(heatmap_path, bbox_inches='tight')
             plt.close()
-            return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, error_message=None)
+            return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name=filename, error_message=None)
 
 @app.route('/update_columns', methods=['POST'])
 def update_columns():
@@ -163,6 +172,7 @@ def sort_columns():
 
             # Generate the heatmap with the sorted combined table
             numeric_combined_table = sorted_combined_table.select_dtypes(include=[np.number])
+            print(numeric_combined_table)
             if not numeric_combined_table.empty:
                 correlation_matrix = numeric_combined_table.corr(method=correlation_method)
                 plt.figure(figsize=(12, 10))  # Adjust heatmap size
@@ -176,10 +186,10 @@ def sort_columns():
                 heatmap_path = os.path.join(app.config['UPLOAD_FOLDER'], heatmap_filename)
                 plt.savefig(heatmap_path, bbox_inches='tight')
                 plt.close()
-                return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, error_message=None)
+                return render_template('heatmap.html', heatmap_filename=heatmap_filename, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name='', error_message=None)
         
-        return render_template('heatmap.html', heatmap_filename=None, table1_columns=table1_columns, table2_columns=table2_columns, error_message="Invalid primary column selected.")
-    return render_template('heatmap.html', heatmap_filename=None, table1_columns=[], table2_columns=[], error_message="No combined table available to sort.")
+        return render_template('heatmap.html', heatmap_filename=None, table1_columns=table1_columns, table2_columns=table2_columns, correlation_method=correlation_method, file_name='', error_message="Invalid primary column selected.")
+    return render_template('heatmap.html', heatmap_filename=None, table1_columns=[], table2_columns=[], correlation_method='pearson', file_name='', error_message="No combined table available to sort.")
 
 @app.route('/download_combined_table', methods=['GET'])
 def download_combined_table():
