@@ -76,6 +76,7 @@ def upload():
 
         # Generate the heatmap with the combined table
         numeric_combined_table = combined_table.select_dtypes(include=[np.number])
+        print(numeric_combined_table)
         if not numeric_combined_table.empty:
             correlation_matrix = numeric_combined_table.corr(method=correlation_method)
             plt.figure(figsize=(12, 10))  # Adjust heatmap size
@@ -119,6 +120,7 @@ def update_columns():
             combined_table, table1_columns, table2_columns = data_processing(selected_data)
 
             numeric_combined_table = combined_table.select_dtypes(include=[np.number])
+            print(numeric_combined_table)
 
             # Generate the heatmap with the selected columns
             if not numeric_combined_table.empty:
@@ -173,6 +175,7 @@ def sort_columns():
             # Generate the heatmap with the sorted combined table
             numeric_combined_table = sorted_combined_table.select_dtypes(include=[np.number])
             print(numeric_combined_table)
+            print('The table is sorted by %s' % primary_column)
             if not numeric_combined_table.empty:
                 correlation_matrix = numeric_combined_table.corr(method=correlation_method)
                 plt.figure(figsize=(12, 10))  # Adjust heatmap size
