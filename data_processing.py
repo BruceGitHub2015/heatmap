@@ -37,5 +37,5 @@ def data_processing(data):
             matched_rows = table1.loc[matched_indices].reset_index(drop=True)                 
     
             # Combine the tables
-            combined_table = pd.concat([table2.reset_index(drop=True), matched_rows], axis=1).dropna()
+            combined_table = pd.concat([matched_rows,table2.reset_index(drop=True)], axis=1).dropna()
     return combined_table, table1_columns, table2_columns
