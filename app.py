@@ -229,4 +229,4 @@ def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 if __name__ == '__main__':
-    app.run(debug=False, port=5003)
+    app.run(host="0.0.0.0",debug=True, port=5003)
