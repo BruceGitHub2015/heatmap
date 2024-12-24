@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>相关性分析</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <style>
+        .ui-tabs .ui-tabs-nav {
+            font-size: 12px; /* Adjust the font size to match the buttons */
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -12,7 +20,6 @@
         <div class="sidebar">
             <form id="file-upload-form" enctype="multipart/form-data">
                 <input type="file" id="file-input" name="file" accept=".csv">
-                <!-- <label for="correlation-method">Correlation Method:</label> -->
                 <select id="correlation-method" name="correlation_method">
                     <option value="pearson" {% if correlation_method == 'pearson' %}selected{% endif %}>Pearson</option>
                     <option value="kendall" {% if correlation_method == 'kendall' %}selected{% endif %}>Kendall</option>
@@ -26,7 +33,8 @@
             <form id="update-columns-form">
                 {% for column in table1_columns %}
                     <label>
-                        <input type="checkbox" name="columns" value="{{ column }}" class="table1" checked>
+                        <input type="checkbox" name="columns" value="{{ column }}" class="table1" 
+                        {% if loop.index0 < 2 %}checked disabled{% else %}checked{% endif %}>
                         {{ column }}
                     </label>
                 {% endfor %}
@@ -35,7 +43,8 @@
                 <button class="button" type="button" onclick="selectNone('table2')">不选</button>
                 {% for column in table2_columns %}
                     <label>
-                        <input type="checkbox" name="columns" value="{{ column }}" class="table2" checked>
+                        <input type="checkbox" name="columns" value="{{ column }}" class="table2" 
+                        {% if loop.index0 < 2 %}checked disabled{% else %}checked{% endif %}>
                         {{ column }}
                     </label>
                 {% endfor %}
@@ -46,14 +55,31 @@
             </form>            
         </div>
         
-        <!-- Center Content: Heatmap -->
+        <!-- Center Content: Tabs for Heatmap and Dendrogram -->
         <div class="content">
-            <div id="heatmap-container" class="heatmap-container">
-                {% if heatmap_filename %}
-                    <img src="/uploads/{{ heatmap_filename }}" alt="Correlation Heatmap">
-                {% else %}
-                    <p>请选择数据上传、分析</p>
-                {% endif %}
+            <div id="tabs">
+                <ul>
+                    <li><a href="#heatmap-tab">Heatmap</a></li>
+                    <li><a href="#dendrogram-tab">Dendrogram</a></li>
+                </ul>
+                <div id="heatmap-tab">
+                    <div id="heatmap-container" class="heatmap-container">
+                        {% if heatmap_filename %}
+                            <img src="/uploads/{{ heatmap_filename }}" alt="Correlation Heatmap">
+                        {% else %}
+                            <p>请选择数据上传、分析</p>
+                        {% endif %}
+                    </div>
+                </div>
+                <div id="dendrogram-tab">
+                    <div id="dendrogram-container" class="dendrogram-container">
+                        {% if dendrogram_filename %}
+                            <img src="/uploads/{{ dendrogram_filename }}" alt="Dendrogram">
+                        {% else %}
+                            <p>请选择数据上传、分析</p>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -90,5 +116,10 @@
         </div>
     </div>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        $(function() {
+            $("#tabs").tabs();
+        });
+    </script>
 </body>
 </html>
