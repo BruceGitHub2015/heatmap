@@ -55,7 +55,7 @@ def generate_heatmap(correlation_matrix, xtick_rotation, correlation_method):
 def generate_dendrogram(correlation_matrix, xtick_rotation, correlation_method):
     # Ensure the correlation matrix contains only finite values
     finite_matrix = np.nan_to_num(correlation_matrix, nan=0.0, posinf=0.0, neginf=0.0)
-    plt.figure(figsize=(9, 6.5))  # Adjust dendrogram size to match heatmap
+    plt.figure(figsize=(10, 10))  # Adjust dendrogram size to match heatmap
     Z = linkage(finite_matrix, 'ward')
     dendrogram(Z, labels=correlation_matrix.columns, leaf_rotation=xtick_rotation)
     plt.title(f"Dendrogram ({correlation_method.capitalize()})", fontsize=12, loc='left')
